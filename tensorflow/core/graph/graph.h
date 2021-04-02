@@ -66,6 +66,7 @@ class NeighborIter;    // Declared below
 class NodeIter;        // Declared below
 class NodeProperties;  // Defined in .cc
 
+// lwk 图节点
 class Node {
  public:
   string DebugString() const;
@@ -131,6 +132,9 @@ class Node {
   const EdgeSet& in_edges() const { return in_edges_; }
   const EdgeSet& out_edges() const { return out_edges_; }
 
+  // lwk source表示没有入边的节点，sink表示没有出边的节点
+  // lwk @id表示图中的节点的变化，tf内部会将用户的计算图加上一个source和一个sink节点
+  // lwk 并且分配id=0和1，所以id>1表示正常的、用户定义的OP
   // Node type helpers.
   bool IsSource() const { return id() == 0; }
   bool IsSink() const { return id() == 1; }
@@ -560,6 +564,7 @@ class Graph {
   GraphEdgesIterable edges() const { return GraphEdgesIterable(edges_); }
 
   // The pre-defined nodes.
+  // lwk 这是2个系统添加的特殊节点，表示计算图的起点和终点
   enum { kSourceId = 0, kSinkId = 1 };
   Node* source_node() const { return FindNodeId(kSourceId); }
   Node* sink_node() const { return FindNodeId(kSinkId); }
@@ -644,6 +649,7 @@ class Graph {
   int num_edges_ = 0;
 
   // Allocated but free nodes and edges.
+  // lwk 图节点缓存区
   std::vector<Node*> free_nodes_;
   std::vector<Edge*> free_edges_;
 

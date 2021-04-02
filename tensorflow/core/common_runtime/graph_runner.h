@@ -54,6 +54,7 @@ class GraphRunner {
   //
   // REQUIRES: `graph`, `env`, and `outputs` are not nullptr.
   // `function_library` may be nullptr.
+  // lwk 输出的tensor和GraphRunner生命周期一致
   typedef std::vector<std::pair<string, Tensor>> NamedTensorList;
   Status Run(Graph* graph, FunctionLibraryRuntime* function_library,
              const NamedTensorList& inputs,

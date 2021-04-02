@@ -466,6 +466,7 @@ Status ResourceMgr::LookupInternal(const string& container, const string& name,
   return s;
 }
 
+// lwk 查找一个资源，不存在的话则创建之
 template <typename T>
 Status ResourceMgr::LookupOrCreate(const string& container, const string& name,
                                    T** resource,
@@ -474,6 +475,7 @@ Status ResourceMgr::LookupOrCreate(const string& container, const string& name,
   *resource = nullptr;
   Status s;
   {
+    // lwk 除了第1次，其实查找资源是无锁的？？？
     tf_shared_lock l(mu_);
     s = LookupInternal(container, name, resource);
     if (s.ok()) return s;

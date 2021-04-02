@@ -151,6 +151,7 @@ Status ResourceMgr::DoCreate(const string& container, TypeIndex type,
                                type.name());
 }
 
+// lwk 不加锁，根据container/type/name查找资源
 Status ResourceMgr::DoLookup(const string& container, TypeIndex type,
                              const string& name,
                              ResourceBase** resource) const {
@@ -275,6 +276,9 @@ const ResourceHandle& HandleFromInput(OpKernelContext* ctx, int input) {
   return ctx->input(input).flat<ResourceHandle>()(0);
 }
 
+// lwk resource-handle是资源类型的句柄，记录了资源的meta详细
+// lwk 通过这些信息可以从container中找到资源，
+// lwk handle作为操作资源的OP的输入
 Status HandleFromInput(OpKernelContext* ctx, StringPiece input,
                        ResourceHandle* handle) {
   const Tensor* tensor;

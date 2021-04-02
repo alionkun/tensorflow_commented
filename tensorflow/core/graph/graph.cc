@@ -367,6 +367,7 @@ Node* Graph::AddNode(const NodeDef& node_def, Status* status) {
 }
 
 Node* Graph::CopyNode(const Node* node) {
+  // lwk source和sink是预定义好的，不会走入copy的逻辑
   DCHECK(!node->IsSource());
   DCHECK(!node->IsSink());
   Node* copy = AllocateNode(node->props_, node);

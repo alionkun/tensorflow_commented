@@ -190,6 +190,7 @@ class _TensorProcessor(_OptimizableVariable):
     raise NotImplementedError("Trying to update a Tensor ", self._v)
 
 
+# lwk 获取变量v的梯度更新方法
 def _get_processor(v):
   """The processor of v."""
   if context.executing_eagerly():
@@ -218,12 +219,13 @@ class Optimizer(
     checkpointable.CheckpointableBase):
   """Base class for optimizers.
 
+  # lwk 这个类定义/实现了向graph添加用于训练模型的OP的API
+
   This class defines the API to add Ops to train a model.  You never use this
   class directly, but instead instantiate one of its subclasses such as
   `GradientDescentOptimizer`, `AdagradOptimizer`, or `MomentumOptimizer`.
 
   ### Usage
-
   ```python
   # Create an optimizer with the desired parameters.
   opt = GradientDescentOptimizer(learning_rate=0.1)
@@ -241,6 +243,8 @@ class Optimizer(
   ```
 
   ### Processing gradients before applying them.
+  # lwk minimize()内部先后调用了梯度计算和梯度更新两个逻辑，
+  # lwk 如果有需要，可以手动实现minimize()，在调用梯度更新之前按需要修改梯度，再执行梯度更新
 
   Calling `minimize()` takes care of both computing the gradients and
   applying them to the variables.  If you want to process the gradients
@@ -274,6 +278,13 @@ class Optimizer(
   the gradients.
 
   The possible values are: `GATE_NONE`, `GATE_OP`, and `GATE_GRAPH`.
+  
+  # lwk 例如 y=ax, 则 dy/dx=a, dy/da=x, 也就是说a和x的梯度都依赖于y的输入
+  # lwk 假设我们先算出了dy/dx，则可以对x进行梯度更新，而如果此时dy/da还没计算出来
+  # lwk 则dy/da使用更新后的x来计算
+  # lwk GATE_NONE表示在一个节点中，某个输入的梯度被计算出来之后，可以直接对该输入进行梯度更新，而无需考虑该节点的其他输入，即使其他输入的梯度依赖于该输入，这个模式的并行度最高，但由于没有同步，所以可能导致计算过程无法复现
+  # lwk GATE_OP表示在一个节点中，只有所有的输入的梯度被计算出来之后，再对所有输入进行统一的梯度更新。
+  # lwk GATE_GRAPH表示只有在整个计算图的所有变量的梯度都计算出来之后，才能执行梯度更新，这个模式并行度最低，但在需要综合所有梯度进行某种计算的时候，必须选择这种模式。
 
   <b>`GATE_NONE`</b>: Compute and apply gradients in parallel.  This provides
   the maximum parallelism in execution, at the cost of some non-reproducibility
@@ -291,6 +302,8 @@ class Optimizer(
   be useful if you want to process all gradients before applying any of them.
 
   ### Slots
+
+  # lwk 一些优化器，例如adam/ada，需要分配额外的变量来维护与参数相关的状态，这些状态变量称为slot
 
   Some optimizer subclasses, such as `MomentumOptimizer` and `AdagradOptimizer`
   allocate and manage additional variables associated with the variables to
@@ -325,12 +338,15 @@ class Optimizer(
       raise ValueError("Must specify the optimizer name")
     self._use_locking = use_locking
     self._name = name
+    # lwk 一个optimizer内部维护了多个slot集合，以slot_name为名，一个slot下面可以有多个变量及对应的slot
     # Dictionary of slots.
     #  {slot_name :
     #      {_var_key(variable_to_train): slot_for_the_variable, ... },
     #   ... }
     self._slots = {}
     self._non_slot_dict = {}
+
+    # lwk 存储关于怎样从checkpoint中恢复slot的信息
     # For implementing Checkpointable. Stores information about how to restore
     # slot variables which have not yet been created
     # (checkpointable._CheckpointPosition objects).
@@ -409,6 +425,7 @@ class Optimizer(
     return self.apply_gradients(grads_and_vars, global_step=global_step,
                                 name=name)
 
+  # lwk 计算loss关于var_list的梯度
   def compute_gradients(self, loss, var_list=None,
                         gate_gradients=GATE_OP,
                         aggregation_method=None,
@@ -484,6 +501,7 @@ class Optimizer(
           "be a function when eager execution is enabled.")
 
     # Scale loss if using a "mean" loss reduction and multiple towers.
+    # 如果是多towers且是reduce by mean，则求loss的平均值
     if (distribute_lib.get_loss_reduction() ==
         variable_scope.VariableAggregation.MEAN):
       num_towers = distribution_strategy_context.get_distribution_strategy(
@@ -499,6 +517,7 @@ class Optimizer(
     self._assert_valid_dtypes([loss])
     if grad_loss is not None:
       self._assert_valid_dtypes([grad_loss])
+    # lwk 如果var_list为空，则使用所有trainable变量
     if var_list is None:
       var_list = (
           variables.trainable_variables() +
@@ -508,15 +527,18 @@ class Optimizer(
     # pylint: disable=protected-access
     var_list += ops.get_collection(ops.GraphKeys._STREAMING_MODEL_PORTS)
     # pylint: enable=protected-access
+    # lwk 获取所有变量的梯度更新方法/器
     processors = [_get_processor(v) for v in var_list]
     if not var_list:
       raise ValueError("No variables to optimize.")
     var_refs = [p.target() for p in processors]
+    # lwk 计算梯度
     grads = gradients.gradients(
         loss, var_refs, grad_ys=grad_loss,
         gate_gradients=(gate_gradients == Optimizer.GATE_OP),
         aggregation_method=aggregation_method,
         colocate_gradients_with_ops=colocate_gradients_with_ops)
+    # lwk 如果是GATE_GRAPH模式，则需要
     if gate_gradients == Optimizer.GATE_GRAPH:
       grads = control_flow_ops.tuple(grads)
     grads_and_vars = list(zip(grads, var_list))
@@ -884,6 +906,7 @@ class Optimizer(
   # Methods to be implemented by subclasses if they want to use the
   # inherited implementation of apply_gradients() or compute_gradients().
   # --------------
+  # lwk loss/variable/gradient的合法数据类型
   def _valid_dtypes(self):
     """Valid types for loss, variables and gradients.
 
@@ -1074,6 +1097,7 @@ class Optimizer(
       self._slots[slot_name] = named_slots
     return named_slots
 
+  # lwk 查找或者创建指定变量对应的slot
   def _get_or_make_slot(self, var, val, slot_name, op_name):
     """Find or create a slot for a variable.
 

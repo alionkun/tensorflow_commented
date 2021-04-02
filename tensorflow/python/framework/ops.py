@@ -3454,6 +3454,7 @@ class Graph(object):
 
     return new_ops
 
+  # lwk 返回obj指定的graph中的OP或者Tensor
   def as_graph_element(self, obj, allow_tensor=True, allow_operation=True):
     """Returns the object referred to by `obj`, as an `Operation` or `Tensor`.
 
@@ -3489,6 +3490,7 @@ class Graph(object):
     with self._lock:
       return self._as_graph_element_locked(obj, allow_tensor, allow_operation)
 
+  # lwk 在graph中查找obj
   def _as_graph_element_locked(self, obj, allow_tensor, allow_operation):
     """See `Graph.as_graph_element()` for details."""
     # The vast majority of this function is figuring
@@ -3513,9 +3515,11 @@ class Graph(object):
 
     # If obj appears to be a name...
     if isinstance(obj, compat.bytes_or_text_types):
+      # lwk obj是一个名称
       name = compat.as_str(obj)
 
       if ":" in name and allow_tensor:
+        # lwk 包含:号，可能是一个Tensor，形如<op_name>:<output_index>
         # Looks like a Tensor name and can be a Tensor.
         try:
           op_name, out_n = name.split(":")
@@ -3524,13 +3528,16 @@ class Graph(object):
           raise ValueError("The name %s looks a like a Tensor name, but is "
                            "not a valid one. Tensor names must be of the "
                            "form \"<op_name>:<output_index>\"." % repr(name))
+        # lwk 按名称找到OP
         if op_name in self._nodes_by_name:
           op = self._nodes_by_name[op_name]
         else:
+          # lwk 根据名称找在graph中对应的节点，名称是一个tensor，表示它是某个OP的输出，但是这个OP却无法在graph中找到
           raise KeyError("The name %s refers to a Tensor which does not "
                          "exist. The operation, %s, does not exist in the "
                          "graph." % (repr(name), repr(op_name)))
         try:
+          # lwk 还是传入的obj不对
           return op.outputs[out_n]
         except:
           raise KeyError("The name %s refers to a Tensor which does not "
@@ -3544,6 +3551,7 @@ class Graph(object):
                          (repr(name), types_str))
 
       elif ":" not in name and allow_operation:
+        # lwk 名称看起来是OP
         # Looks like an Operation name and can be an Operation.
         if name not in self._nodes_by_name:
           raise KeyError("The name %s refers to an Operation not in the "
@@ -3564,6 +3572,7 @@ class Graph(object):
         raise ValueError(err_msg)
 
     elif isinstance(obj, Tensor) and allow_tensor:
+      # obj就是它自己
       # Actually obj is just the object it's referring to.
       if obj.graph is not self:
         raise ValueError("Tensor %s is not an element of this graph." % obj)

@@ -656,15 +656,19 @@ class LookupTableFindOp : public OpKernel {
     // Input 0 could be a STRING_REF or a RESOURCE
     DataType expected_input_0 =
         (ctx->input_dtype(0) == DT_RESOURCE) ? DT_RESOURCE : DT_STRING_REF;
+    // lwk 0=>table, 1=>key_type, 2=>value_type/default_value_type
     DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
                                       table->value_dtype()};
     DataTypeVector expected_outputs = {table->value_dtype()};
+    // lwk 检查实际输入和预期输入是否一致
+    // lwk 这里expected_xxx的命名好像反过来了，其实是real_xxx ？？？
     OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, expected_outputs));
 
     const Tensor& key = ctx->input(1);
     const Tensor& default_value = ctx->input(2);
     OP_REQUIRES_OK(ctx, table->CheckFindArguments(key, default_value));
 
+    // lwk 分配输出tensor
     TensorShape output_shape = key.shape();
     output_shape.RemoveLastDims(table->key_shape().dims());
     output_shape.AppendShape(table->value_shape());

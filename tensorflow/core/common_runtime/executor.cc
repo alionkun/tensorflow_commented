@@ -606,6 +606,7 @@ Status ExecutorImpl::Initialize() {
     FrameInfo* frame_info = EnsureFrameInfo(frame_name);
 
     // See if this node is a root node, and if so, add to root_nodes_.
+    // lwk 没有入边依赖，可以直接执行，添加到ready-queue中
     if (n->in_edges().empty()) {
       root_nodes_.push_back(n);
     }
@@ -616,6 +617,7 @@ Status ExecutorImpl::Initialize() {
     item->input_start = frame_info->total_inputs;
     frame_info->total_inputs += n->num_inputs();
 
+    // lwk 根据NodeDef创建kernel
     Status s = params_.create_kernel(n->def(), &item->kernel);
     if (!s.ok()) {
       item->kernel = nullptr;
@@ -1497,14 +1499,17 @@ void ExecutorState::RunAsync(Executor::DoneCallback done) {
   }
 
   // Initialize the ready queue.
+  // lwk 构建ready queue
   for (const Node* n : impl_->root_nodes_) {
     DCHECK_EQ(n->in_edges().size(), 0);
     ready.push_back(TaggedNode{n, root_frame_, 0, false});
   }
   if (ready.empty()) {
+    // lwk 所有节点都执行完毕，结束
     delete this;
     done(Status::OK());
   } else {
+    // lwk 当前可以执行的节点数量
     num_outstanding_ops_ = ready.size();
     root_frame_->iterations[0]->outstanding_ops = ready.size();
     done_cb_ = std::move(done);
@@ -1585,6 +1590,7 @@ bool MightTrace(const NodeItem& item,
   return false;
 }
 
+// lwk 执行一个节点，scheduled_nsec为该节点开始执行的时间
 void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_nsec) {
   const GraphView& gview = impl_->gview_;
   TaggedNodeSeq ready;
@@ -1779,10 +1785,12 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_nsec) {
           }
         } else {
           // In the common case, avoid creating any tracing objects.
+          // lwk 调用kernel的Compute()接口
           device->Compute(op_kernel, &ctx);
         }
 
         nodestats::SetOpEnd(stats);
+        // lwk 处理kernel计算结果，存储在ctx中
         s = ProcessOutputs(item, &ctx, &outputs, stats);
         if (s.ok() && impl_->device_record_tensor_accesses_) {
           // Get the list of all tensors accessed during the execution
@@ -1808,6 +1816,7 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_nsec) {
       }
       MaybeMarkCompleted(input_frame, input_iter, id);
       // Propagates outputs.
+      // lwk 将当前节点的输出传递到它的下游节点
       if (s.ok()) {
         PropagateOutputs(tagged_node, &item, &outputs, &ready);
       }
@@ -1921,6 +1930,7 @@ Status ExecutorState::PrepareInputs(const NodeItem& item, Entry* first_input,
   return Status::OK();
 }
 
+// lwk 处理op/kernel在Compute()中返回的outputs
 Status ExecutorState::ProcessOutputs(const NodeItem& item, OpKernelContext* ctx,
                                      EntryVector* outputs,
                                      NodeExecStatsInterface* stats) {
@@ -1964,6 +1974,7 @@ Status ExecutorState::ProcessOutputs(const NodeItem& item, OpKernelContext* ctx,
   for (int i = 0; i < item.num_outputs; ++i) {
     const TensorValue val = ctx->release_output(i);
     if (val.tensor == nullptr) {
+      // lwk 只有Switch/Recv节点才可以没有输出tensor
       // Unless it's a Switch or a Recv, the node must produce a
       // tensor value at i-th output.
       if (!IsSwitch(node) && !IsRecv(node)) {
@@ -2186,10 +2197,12 @@ bool ExecutorState::NodeDone(const Status& s, const Node* node,
   return completed;
 }
 
+// lwk 执行ready-q
 void ExecutorState::ScheduleReady(const TaggedNodeSeq& ready,
                                   TaggedNodeReadyQueue* inline_ready) {
   if (ready.empty()) return;
 
+  // lwk 统计耗时
   int64 scheduled_nsec = 0;
   if (stats_collector_) {
     scheduled_nsec = nodestats::NowInNsec();
@@ -2713,6 +2726,7 @@ void ExecutorImpl::RunAsync(const Args& args, DoneCallback done) {
 
 }  // namespace
 
+// lwk 创建一个本地的执行器
 Status NewLocalExecutor(const LocalExecutorParams& params,
                         std::unique_ptr<const Graph> graph,
                         Executor** executor) {

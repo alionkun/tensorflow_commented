@@ -49,6 +49,7 @@ Rendezvous::ParsedKey& Rendezvous::ParsedKey::operator=(const ParsedKey& b) {
 }
 
 /*  static */
+// lwk 创建一个汇合点的名称
 string Rendezvous::CreateKey(const string& src_device, uint64 src_incarnation,
                              const string& dst_device, const string& name,
                              const FrameAndIter& frame_iter) {
@@ -59,6 +60,8 @@ string Rendezvous::CreateKey(const string& src_device, uint64 src_incarnation,
   //
   // "src_incarnation" is used to distinguish a worker when it
   // restarts.
+  // lwk 在名称中包含sender和recevier是为了方便debug，其实只需要recevier便可以work
+  // lwk src_incarnation用于区分worker重启
   char buf[strings::kFastToBufferSize];
   return strings::StrCat(
       src_device, ";", strings::Uint64ToHexString(src_incarnation, buf), ";",

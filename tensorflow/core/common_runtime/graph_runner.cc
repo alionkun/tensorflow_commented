@@ -132,6 +132,7 @@ Status GraphRunner::Run(Graph* graph, FunctionLibraryRuntime* function_library,
   for (const auto& in : inputs) {
     const string& tensor_name = in.first;
     input_names.emplace_back(tensor_name);
+    // lwk 通过回合点机制来实现feed
     string full_key = Rendezvous::CreateKey("/device:CPU:0", 1, "/device:CPU:1",
                                             tensor_name, FrameAndIter(0, 0));
     Rendezvous::ParsedKey parsed;

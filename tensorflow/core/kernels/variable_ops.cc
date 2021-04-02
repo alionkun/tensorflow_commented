@@ -67,6 +67,7 @@ void VariableOp::Compute(OpKernelContext* ctx) {
   LegacyVar* var;
   OP_REQUIRES_OK(ctx, cinfo_.resource_manager()->LookupOrCreate<LegacyVar>(
                           cinfo_.container(), cinfo_.name(), &var, creator));
+  // lwk 输出一个tensor引用，以便外部对齐进行更新
   // Output a reference to our tensor, so it may be updated.
   //
   // As long as the resource manager hasn't been cleared the ref we return

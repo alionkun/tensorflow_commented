@@ -273,6 +273,7 @@ Status GetTableHandle(const string& input_name, OpKernelContext* ctx,
 
 }  // namespace
 
+// lwk 根据@input_name
 Status GetLookupTable(const string& input_name, OpKernelContext* ctx,
                       LookupInterface** table) {
   string container;
@@ -280,6 +281,7 @@ Status GetLookupTable(const string& input_name, OpKernelContext* ctx,
   DataType handle_dtype;
   TF_RETURN_IF_ERROR(ctx->input_dtype(input_name, &handle_dtype));
   if (handle_dtype == DT_RESOURCE) {
+    // lwk 从input中读取资源句柄，根据资源句柄从container中读取资源
     ResourceHandle handle;
     TF_RETURN_IF_ERROR(HandleFromInput(ctx, input_name, &handle));
     return LookupResource(ctx, handle, table);

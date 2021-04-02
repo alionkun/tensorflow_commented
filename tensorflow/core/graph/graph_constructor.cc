@@ -1293,7 +1293,9 @@ Status ImportGraphDef(const ImportGraphDefOptions& opts, const GraphDef& gdef,
   }
 }
 
+// lwk 复制一个graph
 void CopyGraph(const Graph& src, Graph* dest) {
+  // lwk 如果dest有OP节点呢？
   for (Node* n : dest->nodes()) {
     CHECK(n->IsSource() || n->IsSink()) << "*dest must be empty";
   }
@@ -1302,6 +1304,7 @@ void CopyGraph(const Graph& src, Graph* dest) {
   dest->set_versions(src.versions());
 
   // Copy the nodes
+  // lwk 构建以下map，是为了复制边
   std::unordered_map<const Node*, Node*>
       node_map;  // "Node in src" -> "Node in *dest"
   node_map[src.source_node()] = dest->source_node();

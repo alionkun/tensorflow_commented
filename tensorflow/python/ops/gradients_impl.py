@@ -119,6 +119,7 @@ ops.register_tensor_conversion_function(ops.IndexedSlices,
                                         _IndexedSlicesToTensor)
 
 
+# lwk 将所有从from_ops可达的节点找出来
 def _MarkReachedOps(from_ops, reached_ops, func_graphs):
   """Mark all ops reached from "from_ops".
 
@@ -128,6 +129,7 @@ def _MarkReachedOps(from_ops, reached_ops, func_graphs):
     func_graphs: list of _function.FuncGraphs. This method will traverse through
       these functions if they capture from_ops or any reachable ops.
   """
+  # lwk 广度优先遍历
   queue = collections.deque()
   queue.extend(from_ops)
   while queue:
@@ -135,7 +137,9 @@ def _MarkReachedOps(from_ops, reached_ops, func_graphs):
     if op not in reached_ops:
       reached_ops.add(op)
       for output in op.outputs:
+        # lwk 这里output是op的输出，也就是tensor
         if _IsBackpropagatable(output):
+          # lwk consumers返回引用该tensor的所有下游OP
           queue.extend(_Consumers(output, func_graphs))
 
 
@@ -300,6 +304,7 @@ def _IsTrainable(tensor):
                               dtypes.resource)
 
 
+# lwk 其实只是判断tensor的数据类型？？？
 def _IsBackpropagatable(tensor):
   if _IsTrainable(tensor):
     return True
@@ -537,6 +542,7 @@ def _Consumers(t, func_graphs):
   return consumers
 
 
+# lwk 符号微分：构建梯度计算图
 @tf_export("gradients")
 def gradients(ys,
               xs,
@@ -563,6 +569,10 @@ def gradients(ys,
   derivatives using a different initial gradient for each y (e.g., if
   one wanted to weight the gradient differently for each value in
   each y).
+
+  # lwk stop_gradients是一个或者一系列tensor，这些tensor在计算微分的过程中被当做常量
+  # lwk 也就是梯度阻隔，这个特性可以用于计算偏微分
+  # lwk （这个说法以及举的例子好像不正确，非独立变量的偏微分是这样计算的吗）？？？
 
   `stop_gradients` is a `Tensor` or a list of tensors to be considered constant
   with respect to all `xs`. These tensors will not be backpropagated through,
@@ -593,6 +603,7 @@ def gradients(ys,
   backpropagation stops at both `tf.stop_gradient` nodes and nodes in
   `stop_gradients`, whichever is encountered first.
 
+  # lwk 所有整数类型的tensor都被当做常量，为什么？？？
   All integer tensors are considered constant with respect to all `xs`, as if
   they were included in `stop_gradients`.
 
@@ -626,6 +637,7 @@ def gradients(ys,
   # _mutation_lock ensures a Session.run call cannot occur between creating and
   # mutating new ops.
   with ops.get_default_graph()._mutation_lock():  # pylint: disable=protected-access
+    # lwk 加锁确保在构建梯度graph的时候不会执行sess.run()
     return _GradientsHelper(ys, xs, grad_ys, name, colocate_gradients_with_ops,
                             gate_gradients, aggregation_method, stop_gradients)
 
@@ -643,6 +655,8 @@ def _GradientsHelper(ys,
   if context.executing_eagerly():
     raise RuntimeError("tf.gradients is not supported when eager execution "
                        "is enabled. Use tf.GradientTape instead.")
+
+  # lwk src_graph是yx/xs所在的graph吧
   if src_graph is None:
     src_graph = ops.get_default_graph()
 
@@ -666,14 +680,18 @@ def _GradientsHelper(ys,
   else:
     grad_ys = _AsList(grad_ys)
 
+  # lwk name_scope()的第3个参数是一系列的tensor，name_scope会确保这些tensor都在一个graph中，
+  # lwk 并且将这个name_scope插入到这个graph中，即作为默认graph
   with ops.name_scope(
       name, "gradients",
       list(ys) + list(xs) + list(stop_gradients) + list(grad_ys)) as grad_scope:
+    # lwk ？？？
     # Get a uid for this call to gradients that can be used to help
     # cluster ops for compilation.
     gradient_uid = ops.get_default_graph().unique_name("uid")
     ys = ops.convert_n_to_tensor_or_indexed_slices(ys, name="y")
     xs = [
+        # lwk 资源类型的variable需要使用其handle
         x.handle if resource_variable_ops.is_resource_variable(x) else x
         for x in xs
     ]

@@ -164,6 +164,7 @@ def shape_safe_assign_variable_handle(handle, shape, value, name=None):
 
 
 # TODO(apassos) make this be variables.Variable
+# lwk 基于资源句柄的变量
 class ResourceVariable(variables.RefVariable):
   """Variable based on resource handles.
 
@@ -185,6 +186,12 @@ class ResourceVariable(variables.RefVariable):
   carried over to variables, so you can also add nodes to the graph by just
   doing arithmetic on variables.
 
+  # lwk 与基于引用的变量不同，基于资源的变量有良好定义的语义，
+  # lwk 在TF图中，每个对ResourceVariable的使用相当于在计算图中添加了一个read_value的OP
+  # lwk 从read_value返回的tensor可以确保看到所有对变量的修改，这些修改是read_value的直接或者间接依赖
+  # lwk 也就是说read_value的上游依赖节点的修改，对read_value都是可见的
+  # lwk 而read_value的无依赖或者下游节点的修改，对read_value都是不可见的
+
   Unlike ref-based variable, a ResourceVariable has well-defined semantics. Each
   usage of a ResourceVariable in a TensorFlow graph adds a read_value operation
   to the graph. The Tensors returned by a read_value operation are guaranteed to
@@ -194,6 +201,10 @@ class ResourceVariable(variables.RefVariable):
   value of the variable from operations that depend on the read_value operation.
   Updates from operations that have no dependency relationship to the read_value
   operation might or might not be visible to read_value.
+
+  # lwk 例如，如果在一个sess.run()调用中对某个ResourceVariable有多于1次的赋值
+  # lwk 如果赋值操作和读取操作之间有边，则这个变量的值是良好定义的（也就是确定的、按照某种规则定义好了的）
+  # lwk 考虑下面的例子，2个写操作在tf.Variable和tf.ResourceVariable中表现不一样。
 
   For example, if there is more than one assignment to a ResourceVariable in
   a single session.run call there is a well-defined value for each operation
@@ -434,6 +445,7 @@ class ResourceVariable(variables.RefVariable):
           with ops.name_scope("IsInitialized"):
             self._is_initialized_op = (
                 gen_resource_variable_ops.var_is_initialized_op(self._handle))
+          # lwk 添加initializer OP
           if initial_value is not None:
             with ops.name_scope("Assign") as n, ops.colocate_with(self._handle):
               self._initializer_op = (
@@ -442,6 +454,7 @@ class ResourceVariable(variables.RefVariable):
                       self._try_guard_against_uninitialized_dependencies(
                           initial_value),
                       name=n))
+          # lwk 添加read OP
           with ops.name_scope("Read"), ops.colocate_with(self._handle):
             # Manually assign reads to the handle's device to avoid log
             # messages.
@@ -632,6 +645,7 @@ class ResourceVariable(variables.RefVariable):
 
   @property
   def handle(self):
+    # lwk 对应graph中的OP或者Tensor
     """The handle by which this variable can be accessed."""
     return self._handle
 

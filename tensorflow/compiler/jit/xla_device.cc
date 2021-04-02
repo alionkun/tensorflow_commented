@@ -354,6 +354,7 @@ Status XlaDevice::UseGpuDeviceInfo() {
   return GetDeviceContextLocked().status();
 }
 
+// lwk 为graph中的节点设置device_context，和每个节点一一对应
 Status XlaDevice::FillContextMap(const Graph* graph,
                                  DeviceContextMap* device_context_map) {
   VLOG(1) << "XlaDevice::FillContextMap";
