@@ -10,12 +10,14 @@ import "tensorflow/core/framework/attr_value.proto";
 import "tensorflow/core/framework/node_def.proto";
 import "tensorflow/core/framework/op_def.proto";
 
+// lwk 所谓库，就是一个函数的集合
 // A library is a set of named functions.
 message FunctionDefLibrary {
   repeated FunctionDef function = 1;
   repeated GradientDef gradient = 2;
 }
 
+// lwk 当运行时可以为函数绑定所有属性的值，函数就可以被实例化
 // A function can be instantiated when the runtime can bind every attr
 // with a value. When a GraphDef has a call to a function, it must
 // have binding for every attr defined in the signature.
@@ -25,9 +27,11 @@ message FunctionDefLibrary {
 message FunctionDef {
   // The definition of the function's name, arguments, return values,
   // attrs etc.
+  // lwk 函数的签名，包括：函数名、参数、返回值、属性等信息
   OpDef signature = 1;
 
   // Attributes specific to this function definition.
+  // lwk 和当前函数实例关联的属性的值
   map<string, AttrValue> attr = 5;
 
   // NOTE: field id 2 deleted on Jan 11, 2017, GraphDef version 21.

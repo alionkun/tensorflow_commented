@@ -1758,7 +1758,7 @@ REGISTER_OP("BroadcastArgs")
     });
 
 // --------------------------------------------------------------------------
-REGISTER_OP("BroadcastGradientArgs")
+REGISTER_OP("BroacastGradientArgs")
     .Input("s0: T")
     .Input("s1: T")
     .Output("r0: T")

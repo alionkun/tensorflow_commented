@@ -392,9 +392,11 @@ REGISTER_OP_GRADIENT("Cast", CastGrad);
 //
 // TODO(zhifengc): This can be arrange as a function in the standard
 // library.
+// lwk 二元OP的梯度逻辑
 Status GradForBinaryCwise(FunctionDef* g, std::vector<FDH::Node> body) {
   // clang-format off
   std::vector<FDH::Node> nodes = {
+    // lwk sx = tf.Shape(x)
     {{"sx"}, "Shape", {"x"}},
     {{"sy"}, "Shape", {"y"}},
   };
@@ -417,10 +419,13 @@ Status GradForBinaryCwise(FunctionDef* g, std::vector<FDH::Node> body) {
   }
   *g = FDH::Define(
       // Arg defs
+      // lwk 输入参数
       {"x: T", "y: T", "dz: T"},
       // Ret val defs
+      // lwk 输出参数
       {"dx: T", "dy: T"},
       // Attr defs
+      // lwk 参数类型定义
       {{"T: {half, float, double}"}},
       // Nodes
       nodes);
@@ -429,6 +434,7 @@ Status GradForBinaryCwise(FunctionDef* g, std::vector<FDH::Node> body) {
 
 Status AddGrad(const AttrSlice& attrs, FunctionDef* g) {
   // clang-format off
+  // lwk z = x + y，则dx/dL = dL/dz * dz/dx = dL/dz
   return GradForBinaryCwise(g, {
       {{"gx"}, "Identity", {"dz"}},
       {{"gy"}, "Identity", {"dz"}},

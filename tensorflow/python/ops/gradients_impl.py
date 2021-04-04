@@ -129,7 +129,7 @@ def _MarkReachedOps(from_ops, reached_ops, func_graphs):
     func_graphs: list of _function.FuncGraphs. This method will traverse through
       these functions if they capture from_ops or any reachable ops.
   """
-  # lwk 广度优先遍历
+  # lwk 从前往后广度优先遍历
   queue = collections.deque()
   queue.extend(from_ops)
   while queue:
@@ -143,6 +143,7 @@ def _MarkReachedOps(from_ops, reached_ops, func_graphs):
           queue.extend(_Consumers(output, func_graphs))
 
 
+# lwk 计算梯度子图中的节点需要等待多少上游节点ready
 def _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, func_graphs,
                   xs):
   """Initialize the pending count for ops between two lists of Operations.
@@ -169,16 +170,21 @@ def _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, func_graphs,
   """
   # Mark reachable ops from from_ops.
   reached_ops = set()
+  # lwk 将从from_ops可达的所有节点都找出来
   _MarkReachedOps(from_ops, reached_ops, func_graphs)
   # X in reached_ops iff X is reachable from from_ops by a path of zero or more
   # backpropagatable tensors.
 
+  # lwk 取to_ops中所有从from_ops可达的节点
+  # lwk 有些结束节点不可达，表示这些节点和所有起始节点都是割裂的
   reachable_to_ops = set(op for op in to_ops if op in reached_ops)
 
   # Mark between ops.
+  # lwk 计算出所有有效的中间OP
   between_ops = set()
   between_op_list = []
   queue = collections.deque()
+  # lwk 从后往前遍历广度优先遍历，与_MarkReachedOps()对应，两个节点集合的交接就是中间有效节点
   queue.extend(to_ops)
   while queue:
     op = queue.popleft()
@@ -187,13 +193,16 @@ def _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, func_graphs,
       between_ops.add(op)
       between_op_list.append(op)
       # Clear the boolean so we won't add the inputs again.
+      # lwk 从reached集合中清理掉，避免重复添加
       reached_ops.remove(op)
+      # lwk 接收当前节点所有输入
       for inp in _NonEagerInputs(op, xs):
         queue.append(inp.op)
   # X in between_ops iff X is on a path of zero or more backpropagatable tensors
   # between from_ops and to_ops
 
   # 'loop_state' is None if there are no while loops.
+  # lwk 这里有点难搞懂内部细节了
   loop_state = control_flow_ops.MaybeCreateControlFlowState(
       between_op_list, between_ops, colocate_gradients_with_ops)
 
@@ -202,8 +211,13 @@ def _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, func_graphs,
   for op in between_op_list:
     for x in _NonEagerInputs(op, xs):
       if x.op in between_ops:
+        # lwk 在梯度子图中，依赖关系和向前子图是相反的，输入依赖于输出
+        # lwk 如果一个节点被多个节点依赖，则该节点在计算梯度的时候，需要等待所有下游节点传递梯度
         pending_count[x.op] += 1
 
+  # lwk reachable_to_ops 表示有效的ys
+  # lwk pending_count 表示与梯度计算相关的所有节点分别需要等待的依赖节点的数量
+  # lwk loop_state
   return reachable_to_ops, pending_count, loop_state
 
 
@@ -700,6 +714,11 @@ def _GradientsHelper(ys,
     grad_ys = _DefaultGradYs(grad_ys, ys, colocate_gradients_with_ops,
                              gradient_uid)
 
+    # lwk 我们使用的方法如下：
+    # lwk 1）取出所有出于ys和xs之间所有节点，这些节点与构建梯度graph相关，注意ys/xs都是tensor
+    # lwk 2）按照ids的倒序顺序访问这些节点，以确保访问到某个节点的时候，它的输出节点的梯度都ready了
+    # lwk 3）某个节点的所有输出的梯度都ready之后，调用该节点的梯度，然后将梯度添加到它的输入节点的梯度中
+
     # The approach we take here is as follows: Create a list of all ops in the
     # subgraph between the ys and xs.  Visit these ops in reverse order of ids
     # to ensure that when we visit an op the gradients w.r.t its outputs have
@@ -709,6 +728,7 @@ def _GradientsHelper(ys,
 
     # Initialize the pending count for ops in the connected subgraph from ys
     # to the xs.
+    # lwk 注意ys/xs/stop_gradients都是tensor而非op
     to_ops = [t.op for t in ys]
     from_ops = [t.op for t in xs]
     stop_gradient_ops = [t.op for t in stop_gradients]
@@ -722,6 +742,7 @@ def _GradientsHelper(ys,
     # When it is time to call the op's gradient function, for each endpoint we
     # aggregate the list of received gradients into a Add() Operation if there
     # is more than one.
+    # lwk grads变量的形式是map<op, list<list<gradient>>>, 存储每个op的所有输出端的gradients
     grads = {}
 
     # Add the initial gradients for the ys.
@@ -731,10 +752,12 @@ def _GradientsHelper(ys,
     # Initialize queue with to_ops.
     queue = collections.deque()
     # Add the ops in 'to_ops' into the queue.
+    # lwk 先将结束节点加入队列
     to_ops_set = set()
     for op in to_ops:
       # 'ready' handles the case where one output gradient relies on
       # another output's gradient.
+      # lwk to_ops中的OP应该都是ready的吧？？？
       ready = (pending_count[op] == 0)
       if ready and op not in to_ops_set and op in reachable_to_ops:
         to_ops_set.add(op)
@@ -750,10 +773,12 @@ def _GradientsHelper(ys,
     stop_ops = _StopOps(from_ops, stop_gradient_ops, pending_count, xs)
     while queue:
       # generate gradient subgraph for op.
+      # lwk 开始为原计算图生成梯度子图
       op = queue.popleft()
       with _maybe_colocate_with(op, gradient_uid, colocate_gradients_with_ops):
         if loop_state:
           loop_state.EnterGradWhileContext(op, before=True)
+        # lwk 聚合当前op的所有梯度，out_grads形如list<grad>，list的下标为op的output下标
         out_grads = _AggregatedGrads(grads, op, gradient_uid, loop_state,
                                      aggregation_method)
         if loop_state:
@@ -780,6 +805,7 @@ def _GradientsHelper(ys,
             func_call = getattr(op, "__defun", func_call)
             grad_fn = func_call.python_grad_func
           else:
+            # lwk 梯度ready了，获取op的gradient计算函数
             # A grad_fn must be defined, either as a function or as None
             # for ops that do not have gradients.
             try:
@@ -821,6 +847,7 @@ def _GradientsHelper(ys,
                 out_grads[i] = loop_state.ZerosLike(op, i)
               else:
                 out_grads[i] = control_flow_ops.ZerosLikeOutsideLoop(op, i)
+          # lwk 在梯度子图的scope内，梯度op的scope是原op名称加上_grad
           with ops.name_scope(op.name + "_grad"):
             # pylint: disable=protected-access
             with src_graph._original_op(op):
@@ -929,15 +956,21 @@ def _UpdatePendingAndEnqueueReady(grads, op, queue, pending_count, loop_state,
 
 def _SetGrad(grads, t, grad):
   """Sets gradient "grad" in "grads" for tensor "t"."""
+  # lwk grads的形式为map<op, list<grad_list>> list长度等于t.op的输出tensor数量
+  # lwk tensor t对应的梯度为grad
   op = t.op
   op_grads = grads.get(op)
   if not op_grads:
+    # lwk 这个op还没有存储对应的梯度，为它的每个输出端提供一个list存储梯度
+    # lwk 由于该op可能有多个输出端，所以它对应的梯度是2D的
     op_grads = [[] for _ in xrange(len(op.outputs))]
     grads[op] = op_grads
+  # lwk t_grads表示tensor t对应的梯度列表，因为t可能被多个下游op引用，这些梯度最后需要被叠加在一起
   t_grads = op_grads[t.value_index]
   if isinstance(t_grads, list):
     t_grads.append(grad)
   else:
+    # lwk 待探究
     assert control_flow_util.IsLoopSwitch(op)
     op_grads[t.value_index] = grad
 
@@ -999,6 +1032,9 @@ def _LogOpGradients(op, out_grads, in_grads):
                ", ".join([x.name for x in in_grads if _FilterGrad(x)]))
 
 
+# lwk 对多个tensor执行reduce_sum操作（梯度也是tensor）
+# lwk 由于梯度可能来自于多个子图/设备，为了减少设备之间的传输量，
+# lwk 先在设备内部执行reduce_sum，最后再将各个设备中的计算结果加起来
 def _MultiDeviceAddN(tensor_list, gradient_uid):
   """Adds tensors from potentially multiple devices."""
   # Basic function structure comes from control_flow_ops.group().
@@ -1084,6 +1120,7 @@ def _AggregatedGrads(grads,
   ]:
     raise ValueError(
         "Invalid aggregation_method specified %s." % aggregation_method)
+  # lwk out_grads形如list<list<grad>>
   out_grads = _GetGrads(grads, op)
   for i, out_grad in enumerate(out_grads):
     if loop_state:
@@ -1098,6 +1135,7 @@ def _AggregatedGrads(grads,
     ])):
       raise TypeError("gradients have to be either all Tensors "
                       "or all IndexedSlices")
+    # lwk 合并多个梯度，如果梯度为空，则设置为None
     # Aggregate multiple gradients, and convert [] to None.
     if out_grad:
       if len(out_grad) < 2:
