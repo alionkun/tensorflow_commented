@@ -396,6 +396,9 @@ def _GatherGrad(op, grad):
   # exception on the Windows platform when any dimension is larger than
   # int32. params_shape is not used in optimizer apply_sparse gradients,
   # so it's fine to convert it back to int32 regardless of truncation.
+
+  # lwk op表示原op，它的inputs[0]就是params
+  # lwk params可能很大，所以要在params所在的设备计算它的shape，避免大量拷贝
   params = op.inputs[0]
   with ops.colocate_with(params):
     params_shape = array_ops.shape(params, out_type=ops.dtypes.int64)
@@ -403,10 +406,15 @@ def _GatherGrad(op, grad):
 
   # Build appropriately shaped IndexedSlices
   indices = op.inputs[1]
+  # lwk size = [len(ids)]
   size = array_ops.expand_dims(array_ops.size(indices), 0)
+  # lwk 计算原op的输出值的shape，axis=0
   values_shape = array_ops.concat([size, params_shape[1:]], 0)
   values = array_ops.reshape(grad, values_shape)
   indices = array_ops.reshape(indices, size)
+  # lwk IndexedSlices用于表示一个超大tensor的一部分，可以理解为一个特殊的tensor
+  # lwk params有对应的梯度，ids没有
+  # lwk params对应的梯度是一个IndexedSlices，梯度更新的时候直接操作和IndexedSlices对应的部分即可
   return [ops.IndexedSlices(values, indices, params_shape), None]
 
 

@@ -44,10 +44,13 @@ class GatherOp : public OpKernel {
   void Compute(OpKernelContext* c) override {
     const Tensor& params = c->input(0);
     const Tensor& indices = c->input(1);
+    // lwk params至少是1维，一般为2维，也可以多于2维
+    // lwk 多于2维的时候，前axis维看做batch，我们在axis维空间查找id，所以实际上是把params分为3段
     OP_REQUIRES(
         c, TensorShapeUtils::IsVectorOrHigher(params.shape()),
         errors::InvalidArgument("params must be at least 1 dimensional"));
 
+    // lwk GatherV1默认是在params的最外层查找id，即axis=0，params的剩余维度作为单个id对应的结果
     // GatherV2 added an axis argument. For backwards compatibility with Gather,
     // fall back to axis 0 if the op does not have an axis input.
     int64 axis = 0;
@@ -66,15 +69,19 @@ class GatherOp : public OpKernel {
       }
     }
 
+    // lwk axis取值范围要和params兼容
     OP_REQUIRES(
         c, axis >= -params.dims() && axis < params.dims(),
         errors::InvalidArgument("Expected axis in the range [", -params.dims(),
                                 ", ", params.dims(), "), but got ", axis));
+    // lwk 确保axis是正数
     if (axis < 0) {
       axis = params.dims() + axis;
     }
 
     // Check that we have enough index space
+    // lwk gather_dim_size表示要查找的空间，即第axis维度的大小，我们将在这个空间内查找id
+    // lwk gather_dim_size不能超过ids对应的数据类型的最大值
     const int64 gather_dim_size = params.dim_size(axis);
     const int64 N = indices.NumElements();
     OP_REQUIRES(
@@ -86,6 +93,8 @@ class GatherOp : public OpKernel {
 
     // The result shape is params.shape[0:axis] + indices.shape +
     // params.shape[axis + 1:].
+    // lwk 计算返回的结果的shape，就是：
+    // lwk params.shape[0:axis] + indices.shape + params.shape[axis+1:]
     TensorShape result_shape;
     int64 outer_size = 1;
     int64 inner_size = 1;
@@ -102,9 +111,12 @@ class GatherOp : public OpKernel {
     Tensor* out = nullptr;
     OP_REQUIRES_OK(c, c->allocate_output(0, result_shape, &out));
     if (N > 0 && outer_size > 0 && inner_size > 0) {
+      // lwk 按照axis为切分点，打平为3段
       auto params_flat =
           params.shaped<T, 3>({outer_size, gather_dim_size, inner_size});
       auto indices_flat = indices.flat<Index>();
+      // lwk N就是id的数量，由于是按下标访问数组元素，所以一定会有N个结果/每个batch
+      // lwk 调用方保证所有id都是合法的
       auto out_flat = out->shaped<T, 3>({outer_size, N, inner_size});
 
       functor::GatherFunctor<Device, T, Index> functor;
