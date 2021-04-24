@@ -539,6 +539,9 @@ struct ApproximateEqual<CPUDevice, T> {
 
 }  // end namespace functor
 
+// lwk 通用的数学计算kernel注册宏
+// lwk OP是例如 UnaryOp 这类一元数学运算框架，D是设备类型、N是OP名称，F是真正的运算逻辑（一般是eigen函数）
+// lwk T是数据类型，这个一般用于支持多类型，例如float/double等等
 #define REGISTER(OP, D, N, F, T)                                             \
   REGISTER_KERNEL_BUILDER(Name(N).Device(DEVICE_##D).TypeConstraint<T>("T"), \
                           OP<D##Device, F<T>>);
