@@ -192,9 +192,12 @@ class Variable(six.with_metaclass(VariableMetaclass,
                                   checkpointable.CheckpointableBase)):
   """See the [Variables Guide](https://tensorflow.org/guide/variables).
 
+  // lwk 变量用于在不同的计算图执行之间保持状态
   A variable maintains state in the graph across calls to `run()`. You add a
   variable to the graph by constructing an instance of the class `Variable`.
 
+  // lwk 变量的数据类型和形状，定义了之后就固定了
+  // lwk 可以通过assign并且带上validate_shape=False来改变变量的数据类型和形状
   The `Variable()` constructor requires an initial value for the variable,
   which can be a `Tensor` of any type and shape. The initial value defines the
   type and shape of the variable. After construction, the type and shape of

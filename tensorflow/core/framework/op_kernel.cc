@@ -771,6 +771,7 @@ void OpKernelContext::set_output(int index, const Tensor& tensor) {
   DCHECK(!IsRefType(params_->op_kernel->output_type(index)));
   DCHECK_EQ(mutable_output(index), nullptr);
   record_tensor_reference(tensor);
+  // lwk 低层存储TensorBuffer是共享的
   outputs_[index] = TensorValue(new Tensor(tensor));
   if (track_allocations() && tensor.TotalBytes() > 0) {
     mutex_lock l(stats_mu_);

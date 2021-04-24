@@ -477,6 +477,7 @@ class OpOutputList {
 
 // Holds a tensor or tensor reference. For tensor references, we need
 // a mutex to prevent concurrent access to the tensor.
+// lwk 用来包装一个tensor或者一个tensor的引用，如果是引用，则需加锁
 struct TensorValue {
   TensorValue() : mutex_if_ref(nullptr), tensor(nullptr) {}
   TensorValue(Tensor* t)  // NOLINT(runtime/explicit)
@@ -1159,6 +1160,7 @@ class OpKernelContext {
 
   // The following data members are only used when allocation tracking is
   // enabled.
+  // lwk 记录内存分配跟踪时需要加锁
   mutable mutex stats_mu_;
   int64 temp_memory_allocated_ GUARDED_BY(stats_mu_);
   int64 persistent_memory_allocated_ GUARDED_BY(stats_mu_);

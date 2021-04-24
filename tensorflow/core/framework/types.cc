@@ -113,6 +113,7 @@ string DataTypeString(DataType dtype) {
   return DataTypeStringInternal(dtype);
 }
 
+// lwk xxx_ref表示xxx类型对应的引用类型，类型ID为xxx类型的基础上加上100
 bool DataTypeFromString(StringPiece sp, DataType* dt) {
   if (str_util::EndsWith(sp, "_ref")) {
     sp.remove_suffix(4);
