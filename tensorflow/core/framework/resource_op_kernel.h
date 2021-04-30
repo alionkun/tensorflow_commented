@@ -28,6 +28,7 @@ limitations under the License.
 
 namespace tensorflow {
 
+// 资源类型的OP的虚拟基类，封装了从container查找资源和新建资源的逻辑
 // ResourceOpKernel<T> is a virtual base class for resource op implementing
 // interface type T. The inherited op looks up the resource name (determined by
 // ContainerInfo), and creates a new resource if necessary.

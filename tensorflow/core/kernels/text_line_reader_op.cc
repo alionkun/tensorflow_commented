@@ -33,11 +33,14 @@ class TextLineReader : public ReaderBase {
         env_(env),
         line_number_(0) {}
 
+  // lwk 读新的文件
   Status OnWorkStartedLocked() override {
     line_number_ = 0;
+    // lwk 打开一个支持随机读取的文件
     TF_RETURN_IF_ERROR(env_->NewRandomAccessFile(current_work(), &file_));
 
     input_buffer_.reset(new io::InputBuffer(file_.get(), kBufferSize));
+    // lwk 跳过文件header
     for (; line_number_ < skip_header_lines_; ++line_number_) {
       string line_contents;
       Status status = input_buffer_->ReadLine(&line_contents);
@@ -51,11 +54,13 @@ class TextLineReader : public ReaderBase {
     return Status::OK();
   }
 
+  // lwk 读完一个旧的文件
   Status OnWorkFinishedLocked() override {
     input_buffer_.reset(nullptr);
     return Status::OK();
   }
 
+  // lwk 读文件得到的record是kv形式，k是文件名和行数，v是本行的内容
   Status ReadLocked(string* key, string* value, bool* produced,
                     bool* at_end) override {
     Status status = input_buffer_->ReadLine(value);

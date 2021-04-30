@@ -31,6 +31,7 @@ namespace tensorflow {
 // NOTE: This is now a very thin layer over ResourceOpKernel.
 // TODO(sjhwang): Remove dependencies to this class, then delete this.
 
+// lwk 封装了reader kernel的公共、核心逻辑
 // Implementation for ops providing a Reader.
 class ReaderOpKernel : public ResourceOpKernel<ReaderInterface> {
  public:

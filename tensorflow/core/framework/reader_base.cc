@@ -91,8 +91,10 @@ int64 ReaderBase::ReadUpTo(const int64 num_records, QueueInterface* queue,
     if (!work_in_progress()) {
       work_ = GetNextWorkLocked(queue, context);
       if (!context->status().ok()) {
+        // lwk work队列为空，已经到结尾
         return records_produced_this_call;
       }
+      // lwk 读新的文件，即work
       Status status = OnWorkStartedLocked();
       if (status.ok()) {
         work_started_++;
