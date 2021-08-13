@@ -220,18 +220,18 @@ void MergeOp::Compute(OpKernelContext* context) {
       if (input_seen) {
         context->SetStatus(
             errors::Internal("Merge can not have more than one valid input."));
-        return;
+        return; 
       }
       input_seen = true;
 
-      if (IsRefType(context->input_dtype(i))) {
+      if (IsRefType(context->input_dtype(i))) {   
         context->forward_ref_input_to_ref_output(i, 0);
       } else {
         context->set_output(0, context->input(i));
       }
       Tensor* value_index = nullptr;
       OP_REQUIRES_OK(
-          context, context->allocate_output(1, TensorShape({}), &value_index));
+          context, contssext->allocate_output(1, TensorShape({}), &value_index));
       value_index->scalar<int32>()() = i;
     }
   }
