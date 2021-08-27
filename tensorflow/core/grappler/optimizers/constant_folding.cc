@@ -711,25 +711,25 @@ Status ConstantFolding::MaterializeConstants(
 
 bool ConstantFolding::IsFoldable(const NodeDef& node) const {
   // Folding not applicable to ops with no inputs.
-  if (node.input().empty()) {
+  if (node.input().empty()) { // 常量折叠的场景是：如果输入为常量，则输出亦是常量。没有输入，自然没有折叠的必要
     return false;
   }
   // Skips nodes that must be preserved except whitelisted nodes.
   if (nodes_to_preserve_.find(node.name()) != nodes_to_preserve_.end() &&
-      nodes_whitelist_.find(node.name()) == nodes_whitelist_.end()) {
+      nodes_whitelist_.find(node.name()) == nodes_whitelist_.end()) { // 被保留的且不是白名单，不折叠
     return false;
   }
   // Skip control flow nodes, they can't be folded.
-  if (ModifiesFrameInfo(node)) {
+  if (ModifiesFrameInfo(node)) { // 跳过控制流
     return false;
   }
   // Skip constants, they're already folded
-  if (IsConstant(node)) {
+  if (IsConstant(node)) { // 跳过常量
     return false;
   }
 
   // Don't fold stateful ops such as TruncatedNormal.
-  if (!IsFreeOfSideEffect(node)) {
+  if (!IsFreeOfSideEffect(node)) { // 跳过有状态的节点，即跳过非无副作用的
     return false;
   }
 
@@ -752,7 +752,7 @@ bool ConstantFolding::IsFoldable(const NodeDef& node) const {
     return false;
   }
   // Don't fold ops without outputs.
-  if (op_def->output_arg_size() == 0) {
+  if (op_def->output_arg_size() == 0) { // 没有输出的节点，也跳过
     return false;
   }
 
@@ -2302,7 +2302,7 @@ bool ConstantFolding::SimplifyReshape(const GraphProperties& properties,
   return true;
 }
 
-Status ConstantFolding::SimplifyArithmeticOperations(
+Status ConstantFolding::SimplifyArithmeticOperations( // 数学运算化简
     const GraphProperties& properties, bool use_shape_info,
     GraphDef* optimized_graph, NodeDef* node, bool* success) {
   const bool is_mul = IsMul(*node) || IsLogicalAnd(*node);
@@ -2969,10 +2969,11 @@ bool ConstantFolding::MergeConcat(const GraphProperties& properties,
   return true;
 }
 
+// 一轮优化
 Status ConstantFolding::RunOptimizationPass(Cluster* cluster,
                                             const GrapplerItem& item,
                                             GraphDef* optimized_graph) {
-  node_map_.reset(new NodeMap(graph_));
+  node_map_.reset(new NodeMap(graph_)); // map(节点名称, 节点/下游节点列表)
   nodes_whitelist_.clear();
   // Fold fetch nodes iff it has a single fanout. Note that if a fetch node
   // has a single fanout, it would be rewritten as a constant with the same
@@ -3014,7 +3015,7 @@ Status ConstantFolding::Optimize(Cluster* cluster, const GrapplerItem& item,
   // the same here.
   port::ScopedFlushDenormal flush;
   port::ScopedSetRound round(FE_TONEAREST);
-  nodes_to_preserve_ = item.NodesToPreserve();
+  nodes_to_preserve_ = item.NodesToPreserve(); // 获取需要保留的节点
   for (const auto& feed : item.feed) {
     feed_nodes_.insert(NodeName(feed.first));
   }
@@ -3038,9 +3039,9 @@ Status ConstantFolding::Optimize(Cluster* cluster, const GrapplerItem& item,
   int64 node_count;
   do {
     graph_modified_ = false;
-    item_to_optimize.graph.Swap(optimized_graph);
+    item_to_optimize.graph.Swap(optimized_graph); // 上一轮优化的结果，作为下一轮的base
     graph_ = &item_to_optimize.graph;
-    *optimized_graph = GraphDef();
+    *optimized_graph = GraphDef(); // 本轮优化的结果
     node_count = graph_->node_size();
     TF_RETURN_IF_ERROR(
         RunOptimizationPass(cluster, item_to_optimize, optimized_graph));

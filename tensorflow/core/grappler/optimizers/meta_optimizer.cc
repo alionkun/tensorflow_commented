@@ -272,7 +272,7 @@ Status MetaOptimizer::OptimizeGraph(Cluster* cluster, const GrapplerItem& item,
   }
 
   std::vector<std::unique_ptr<GraphOptimizer>> optimizers;
-  if (cfg_.optimizers().empty()) {
+  if (cfg_.optimizers().empty()) { // 用户没有配置optimizer，则使用默认的优化组合
     TF_RETURN_IF_ERROR(InitializeOptimizers(&optimizers));
   } else {
     TF_RETURN_IF_ERROR(InitializeOptimizersByName(&optimizers));

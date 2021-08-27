@@ -318,7 +318,7 @@ bool IsPlaceholder(const tensorflow::NodeDef& node_def) {
   for (const auto& attr : node_def.attr()) {
     if (attr.first == "dtype") {
       if (attr.second.type() == tensorflow::DT_INT32) {
-        found_dtype = true;
+        found_dtype = true; // why
       } else {
         return false;
       }

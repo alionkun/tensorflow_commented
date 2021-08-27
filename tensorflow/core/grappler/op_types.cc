@@ -501,7 +501,7 @@ bool IsFreeOfSideEffect(const NodeDef& node) {
   return !ModifiesInputsInPlace(node);
 }
 
-bool ModifiesInputsInPlace(const NodeDef& node) {
+bool ModifiesInputsInPlace(const NodeDef& node) { // 判断是否为会修改输入的值的op
   // Some nodes do in-place updates on regular tensor inputs.
   string op_name = node.op();
 
@@ -511,7 +511,7 @@ bool ModifiesInputsInPlace(const NodeDef& node) {
       op_name == "ResourceScatterAdd" || op_name == "ResourceScatterSub" ||
       op_name == "ResourceScatterMul" || op_name == "ResourceScatterDiv" ||
       op_name == "ResourceScatterMin" || op_name == "ResourceScatterMax") {
-    return false;
+    return false; // why
   }
 
   std::transform(op_name.begin(), op_name.end(), op_name.begin(), ::tolower);

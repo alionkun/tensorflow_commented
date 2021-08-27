@@ -34,7 +34,7 @@ namespace tensorflow {
 namespace grappler {
 
 // A utility class to lookup a node and its outputs by node name.
-class NodeMap {
+class NodeMap { // 通过名称查找节点及下游节点列表
  public:
   // Note: The NodeMap will store pointers to nodes in graph, which may become
   // invalid if graph is changed.
@@ -142,9 +142,9 @@ inline int NodePositionIfSameNode(const string& input_name,
 inline StringPiece NodeNameAsStringPiece(const string& name) {
   static const string empty;
   if (name.empty()) return StringPiece(empty);
-  const auto begin_it = name[0] == '^' ? name.begin() + 1 : name.begin();
+  const auto begin_it = name[0] == '^' ? name.begin() + 1 : name.begin(); // 跳过控制依赖标记
   auto end_it = begin_it;
-  while (end_it != name.end() && *end_it != ':') {
+  while (end_it != name.end() && *end_it != ':') { // 忽略节点的输出端index部分
     ++end_it;
   }
   if (end_it != name.end() && *end_it != ':') {
