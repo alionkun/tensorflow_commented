@@ -137,13 +137,13 @@ TEST_F(ConstantFoldingTest, SimpleFolding) {
   Status status = optimizer.Optimize(nullptr, item, &output);
   TF_EXPECT_OK(status);
 
-  EXPECT_EQ(1, output.node_size());
+  EXPECT_EQ(1, output.node_size()); // 因为 (1 + 2) + 2 == 5，所以优化的结果是只有一个常量
 
   const NodeDef& node_d = output.node(0);
   EXPECT_EQ("d", node_d.name());
   EXPECT_EQ("Const", node_d.op());
 
-  std::vector<string> fetch = {"d"};
+  std::vector<string> fetch = {"d"}; // 验证优化前、优化后的结果是一致的
   auto tensors_expected = EvaluateNodes(item.graph, fetch);
   auto tensors = EvaluateNodes(output, fetch);
   EXPECT_EQ(1, tensors_expected.size());
@@ -280,8 +280,6 @@ TEST_F(ConstantFoldingTest, ConvPushDownTest) {
   GraphDef output;
   Status status = fold.Optimize(nullptr, item, &output);
   TF_EXPECT_OK(status);
-
-  std::cout << output.DebugString() << std::endl;
 
   EXPECT_EQ(5, output.node_size());
   int found = 0;
@@ -3014,8 +3012,8 @@ TEST_F(ConstantFoldingTest, TrivialPack) {
   Output y = ops::Const(scope.WithOpName("y"), {2.0f}, {});
   auto stack =
       ops::Stack(scope.WithOpName("stack").WithControlDependencies({y}), {x},
-                 ops::Stack::Axis(1));
-  auto stack_no_axis = ops::Stack(scope.WithOpName("stack_no_axis"), {x});
+                 ops::Stack::Axis(1)); // [[1,2],[3,4]] => [[1,3],[2,4]]
+  auto stack_no_axis = ops::Stack(scope.WithOpName("stack_no_axis"), {x}); // [[1,2],[3,4]] => [[1,2],[3,4]]
 
   GrapplerItem item;
   TF_CHECK_OK(scope.ToGraphDef(&item.graph));

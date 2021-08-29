@@ -1461,6 +1461,8 @@ bool ConstantFolding::IsZeros(const NodeDef& node) const {
   return false;
 }
 
+// 将node修改为identity
+// identity的输入是node的第input_to_forward个输入
 void ConstantFolding::ReplaceOperationWithIdentity(
     int input_to_forward, const GraphProperties& properties, NodeDef* node,
     GraphDef* graph) {
@@ -1472,10 +1474,10 @@ void ConstantFolding::ReplaceOperationWithIdentity(
   (*node->mutable_attr())["T"].set_type(dtype);
   // Propagate the designated input through the identity.
   node->mutable_input()->SwapElements(0, input_to_forward);
-  // Add all other inputs as control dependencies.
+  // Add all other inputs as control dependencies. 为什么？
   for (int i = 1; i < node->input_size(); ++i) {
     if (IsControlInput(node->input(i))) {
-      break;
+      break; // 应该是continue吧
     }
     const string ctrl_dep =
         AddControlDependency(node->input(i), graph, node_map_.get());
@@ -2326,6 +2328,7 @@ Status ConstantFolding::SimplifyArithmeticOperations( // 数学运算化简
 
     // Simplify element-wise multiplication by ones or addition/subtraction
     // of zeros.
+    // 简化按元素的乘法（乘以`1`）、加减法（加减`0`）
     const TensorShapeProto& y_shape =
         properties.GetInputProperties(node->name())[1].shape();
     const bool x_is_zero = IsZeros(*x);

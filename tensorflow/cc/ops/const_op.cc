@@ -41,7 +41,7 @@ Output ConstHelper(const Scope& scope, const T& value, DataType dtype) {
 }
 }  // namespace
 
-Output Const(const Scope& scope, const Input::Initializer& val) {
+Output Const(const Scope& scope, const Input::Initializer& val) { // 隐式类型转换 Input::Initializer(Tensor)
   if (!val.status.ok()) {
     scope.UpdateStatus(val.status);
     return Output();

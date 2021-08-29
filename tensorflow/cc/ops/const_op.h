@@ -33,7 +33,7 @@ Output ConstFromProto(const Scope& scope, const TensorProto& proto);
 NodeBuilder::NodeOut AsNodeOut(const Scope& scope, const Input& inp);
 
 template <typename T>
-Output Const(const Scope& scope, const Input::Initializer& val) {
+Output Const(const Scope& scope, const Input::Initializer& val) { // Input::Initializer的构造函数接受一个Tensor
   auto orig_const_output = Const(scope, val);
   if (!scope.ok()) return Output();
 

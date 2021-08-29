@@ -115,7 +115,7 @@ class Input {
       tensor = t;
     }
 
-    Initializer(const Tensor& t) : tensor(t) {}  // NOLINT(runtime/explicit)
+    Initializer(const Tensor& t) : tensor(t) {}  // NOLINT(runtime/explicit) // 关闭对隐式转换的检查
 
     /// Construct from a scalar value and an explicit shape
     template <typename T, typename = typename std::enable_if<
