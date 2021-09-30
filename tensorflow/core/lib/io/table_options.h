@@ -21,6 +21,8 @@ limitations under the License.
 namespace tensorflow {
 namespace table {
 
+// 数据库内容存储在一个block集合中，一个block位于一个文件中，每个block包含一个kv对的序列
+// 每个block可能会被压缩之后再写入文件中
 // DB contents are stored in a set of blocks, each of which holds a
 // sequence of key,value pairs.  Each block may be compressed before
 // being stored in a file.  The following enum describes which
@@ -38,12 +40,12 @@ struct Options {
   // block size specified here corresponds to uncompressed data.  The
   // actual size of the unit read from disk may be smaller if
   // compression is enabled.  This parameter can be changed dynamically.
-  size_t block_size = 262144;
+  size_t block_size = 262144; // 未压缩的block大概的大小，因为在使用的时候占用内存
 
   // Number of keys between restart points for delta encoding of keys.
   // This parameter can be changed dynamically.  Most clients should
   // leave this parameter alone.
-  int block_restart_interval = 16;
+  int block_restart_interval = 16; // TODO(wilkenslin) why
 
   // Compress blocks using the specified compression algorithm.  This
   // parameter can be changed dynamically.

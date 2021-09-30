@@ -30,7 +30,7 @@ class Block;
 
 // BlockHandle is a pointer to the extent of a file that stores a data
 // block or a meta block.
-class BlockHandle {
+class BlockHandle { // block的定位信息，也就是offset和size；而BlockContents保存的是block的内容
  public:
   BlockHandle();
 
@@ -86,7 +86,7 @@ class Footer {
 static const uint64 kTableMagicNumber = 0xdb4775248b80fb57ull;
 
 // 1-byte type + 32-bit crc
-static const size_t kBlockTrailerSize = 5;
+static const size_t kBlockTrailerSize = 5; // 尾标
 
 struct BlockContents {
   StringPiece data;     // Actual contents of data

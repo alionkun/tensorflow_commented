@@ -78,7 +78,7 @@ Status Footer::DecodeFrom(StringPiece* input) {
 }
 
 Status ReadBlock(RandomAccessFile* file, const BlockHandle& handle,
-                 BlockContents* result) {
+                 BlockContents* result) { // 在文件中读取有handle定位的block
   result->data = StringPiece();
   result->cachable = false;
   result->heap_allocated = false;

@@ -53,7 +53,7 @@ void SaveTensors(
 
   // Path, names, and slices if save_slices is true.
   const int kFixedInputs = save_slices ? 3 : 2;
-  const Tensor& tensor_names_t = context->input(1);
+  const Tensor& tensor_names_t = context->input(1); // tensor_names表示要保持的tensor的名称，最后的参数是不定长的tensor list
   OP_REQUIRES(context,
               FastBoundsCheck(tensor_names_t.NumElements() + kFixedInputs,
                               std::numeric_limits<int>::max()),
@@ -90,6 +90,7 @@ void SaveTensors(
   // Process tensors in sorted name order.  This allows us to avoid seeking
   // during restoration in the common case where we are restoring a full
   // checkpoint.
+  // 按照名称对tensor name进行排序，保存排序后的tensor name在tensor_names_t中的下标，为了访问对应的tensor
   std::vector<size_t> sorted_name_idx(tensor_names_flat.size());
   std::iota(sorted_name_idx.begin(), sorted_name_idx.end(), 0);
   std::sort(sorted_name_idx.begin(), sorted_name_idx.end(),
@@ -97,7 +98,7 @@ void SaveTensors(
               return tensor_names_flat(a) < tensor_names_flat(b);
             });
 
-  for (const size_t i : sorted_name_idx) {
+  for (const size_t i : sorted_name_idx) { // 按照tensor name字典序遍历tensor
     const string& name = tensor_names_flat(i);
     const Tensor& input = context->input(i + kFixedInputs);
     TensorShape shape(input.shape());
