@@ -82,7 +82,7 @@ class Device : public DeviceBase {
   // Subclasses may override this function if they wish to perform
   // some initialization before each compute.
   virtual void Compute(OpKernel* op_kernel, OpKernelContext* context) {
-    op_kernel->Compute(context);
+    op_kernel->Compute(context); // 设备负责调用kernel.compute()
   }
 
   // Asynchronous kernel's compute.

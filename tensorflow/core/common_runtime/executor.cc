@@ -122,12 +122,12 @@ void SetReferencedTensors(NodeExecStatsInterface* stats,
 class ExecutorImpl;
 class GraphView;
 
-struct EdgeInfo {
-  int dst_id;
-  int output_slot : 31;
+struct EdgeInfo { // 计算图中的1个边，如果被n个节点引用为输入，则有n个EdgeInfo
+  int dst_id; // 这条边指向哪个下游节点
+  int output_slot : 31; // 这条边是本节点的第几个输出端
   // true if this is the last info for output_slot in the EdgeInfo list.
-  bool is_last : 1;
-  int input_slot;
+  bool is_last : 1; // 这条边的最后一个副本？
+  int input_slot; // 这条边是下游节点的第几个输入端
 };
 
 struct NodeItem {
@@ -158,10 +158,10 @@ struct NodeItem {
 
   // ExecutorImpl::tensors_[input_start] is the 1st positional input
   // for this node.
-  int input_start = 0;
+  int input_start = 0; // lwk 当前节点的第一个输入在当前frame的输入tensor数组的下标
 
   // Number of output edges.
-  size_t num_output_edges;
+  size_t num_output_edges; // 当前节点的输出的数量
 
   PendingCounts::Handle pending_id;
 
@@ -360,7 +360,7 @@ class ExecutorImpl : public Executor {
   bool device_record_tensor_accesses_ = false;
 
   // Root nodes (with no in edges) that should form the initial ready queue
-  std::vector<const Node*> root_nodes_;
+  std::vector<const Node*> root_nodes_; // 执行计算图的起始节点，没有输入依赖，用于初始化就绪队列
 
   // Mapping from frame name to static information about the frame.
   // TODO(yuanbyu): We could cache it along with the graph so to avoid
@@ -461,6 +461,7 @@ char* GraphView::InitializeNode(char* ptr, const Node* n) {
   // a given output slot.  For all but the last, we need to do a copy of the
   // Tensor when propagating results downstream in the graph, but for the
   // last one, we can just do a move of the Tensor object to propagate it.
+  // 最后一个可以move，其他的只能copy， why
   gtl::InlinedVector<EdgeInfo*, 4> last_indices(num_outputs, nullptr);
   EdgeInfo* dst_edge = item->output_edge_base();
   for (auto e : n->out_edges()) {
@@ -848,7 +849,7 @@ class ExecutorState {
  private:
   // Either a tensor pointer (pass-by-reference) or a tensor (pass-by-value).
   // TODO(yuanbyu): A better way to do "has_value"?
-  struct Entry {
+  struct Entry { // lwk 表示一个输入，可能为空，或者是tensor*/tensor&
     Entry() {}
     Entry(const Entry& other)
         : ref(other.ref),
@@ -952,7 +953,7 @@ class ExecutorState {
     // is resized once. Each element of tensors_ is written once by the
     // source node of an edge and is cleared by the destination of the same
     // edge. The latter node is never run concurrently with the former node.
-    Entry* input_tensors;
+    Entry* input_tensors; // 每个迭代都有一个引用，寻址方法：input_tensors[k][impl_->nodes[i].input_start + j]
 
     // The number of outstanding ops for each iteration.
     size_t outstanding_ops;
@@ -1057,7 +1058,7 @@ class ExecutorState {
     int num_outstanding_iterations GUARDED_BY(mu) = 1;
 
     // The active iteration states of this frame.
-    gtl::InlinedVector<IterationState*, 12> iterations;
+    gtl::InlinedVector<IterationState*, 12> iterations; // 当前调用帧的迭代状态，没有循环的话占用[0]
 
     // The NextIteration nodes to enter a new iteration. If the number of
     // outstanding iterations reaches the limit, we will defer the start of
@@ -1173,7 +1174,7 @@ class ExecutorState {
     }
   };
 
-  // A tagged node: <frame*, iter, node*>.
+  // A tagged node: <frame*, iter, node*>. // 指定node在哪个frame下的哪个iteration
   struct TaggedNode {
     const Node* node = nullptr;
     FrameState* input_frame = nullptr;
@@ -1260,7 +1261,7 @@ class ExecutorState {
   bool dumped_on_error_ = false;
 
   // The root frame in which the execution of this step is started.
-  FrameState* root_frame_;
+  FrameState* root_frame_; // 根调用帧
 
   // Invoked when the execution finishes.
   Executor::DoneCallback done_cb_;
@@ -1380,12 +1381,12 @@ ExecutorState::ExecutorState(const Executor::Args& args, ExecutorImpl* impl)
   // We start the entire execution in iteration 0 of the root frame
   // so let us create the root frame and the state for iteration 0.
   // We assume root_frame_->frame_name.empty().
-  root_frame_ = new FrameState(impl_, 1);
+  root_frame_ = new FrameState(impl_, 1); // 整个sess.run()运行在root_frame的iteration 0中
   root_frame_->frame_id = 0;  // must be 0
   root_frame_->InitializeFrameInfo(root_frame_->frame_name);
 
   // Initialize iteration 0.
-  root_frame_->iterations.resize(root_frame_->max_parallel_iterations);
+  root_frame_->iterations.resize(root_frame_->max_parallel_iterations); // iterations维护的是当前正在运行的iteration列表
   root_frame_->iterations[0] = new IterationState(
       root_frame_->pending_counts, root_frame_->total_input_tensors);
 
@@ -1484,7 +1485,7 @@ void ExecutorImpl::InitializePending(const Graph* graph,
   }
 }
 
-void ExecutorState::RunAsync(Executor::DoneCallback done) {
+void ExecutorState::RunAsync(Executor::DoneCallback done) { // lwk 计算图调度、执行入口
   const Graph* graph = impl_->graph_.get();
   TaggedNodeSeq ready;
 
@@ -1500,12 +1501,12 @@ void ExecutorState::RunAsync(Executor::DoneCallback done) {
 
   // Initialize the ready queue.
   // lwk 构建ready queue
-  for (const Node* n : impl_->root_nodes_) {
+  for (const Node* n : impl_->root_nodes_) { // 就绪队列，节点属于root_frame，并且iteration=0（没有循环）
     DCHECK_EQ(n->in_edges().size(), 0);
     ready.push_back(TaggedNode{n, root_frame_, 0, false});
   }
   if (ready.empty()) {
-    // lwk 所有节点都执行完毕，结束
+    // lwk 所有节点都执行完毕，结束；没有需要执行的节点，when？
     delete this;
     done(Status::OK());
   } else {
@@ -1675,6 +1676,8 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_nsec) {
     // Only execute this node if it is not dead or it is a send/recv
     // transfer node. For transfer nodes, we need to propagate the "dead"
     // bit even when the node is dead.
+    // 如果节点被标记为dead，则不需要执行，dead标记会随着计算图传播出去
+    // 但如果是recv/send节点，dead标记需要进行传递，具体逻辑见recv/send->compute()
     bool launched_asynchronously = false;
     if (tagged_node.is_dead && !IsTransferNode(node)) {
       outputs.resize(item.num_outputs);
@@ -1974,7 +1977,7 @@ Status ExecutorState::ProcessOutputs(const NodeItem& item, OpKernelContext* ctx,
   for (int i = 0; i < item.num_outputs; ++i) {
     const TensorValue val = ctx->release_output(i);
     if (val.tensor == nullptr) {
-      // lwk 只有Switch/Recv节点才可以没有输出tensor
+      // lwk 只有Switch/Recv节点才可以没有输出tensor，例如switch的2个输出中只有1个有效
       // Unless it's a Switch or a Recv, the node must produce a
       // tensor value at i-th output.
       if (!IsSwitch(node) && !IsRecv(node)) {
@@ -2045,6 +2048,7 @@ Status ExecutorState::ProcessOutputs(const NodeItem& item, OpKernelContext* ctx,
   return s;
 }
 
+// 将输出传递给下游节点，使其get ready
 void ExecutorState::PropagateOutputs(const TaggedNode& tagged_node,
                                      const NodeItem* item, EntryVector* outputs,
                                      TaggedNodeSeq* ready) {
@@ -2197,7 +2201,7 @@ bool ExecutorState::NodeDone(const Status& s, const Node* node,
   return completed;
 }
 
-// lwk 执行ready-q
+// lwk 执行ready-q，核心
 void ExecutorState::ScheduleReady(const TaggedNodeSeq& ready,
                                   TaggedNodeReadyQueue* inline_ready) {
   if (ready.empty()) return;
@@ -2530,6 +2534,7 @@ void ExecutorState::CleanupFramesIterations(FrameState* frame, int64 iter,
   }
 }
 
+// 激活同一个frame/iter下的所有下游节点 output-edge-list
 void ExecutorState::FrameState::ActivateNodes(const NodeItem* item,
                                               const bool is_dead, int64 iter,
                                               EntryVector* outputs,
@@ -2540,8 +2545,8 @@ void ExecutorState::FrameState::ActivateNodes(const NodeItem* item,
   const EdgeInfo* edges = item->output_edge_list();
   Entry* input_tensors = iter_state->input_tensors;
   for (size_t out_index = 0; out_index < num_output_edges; out_index++) {
-    const EdgeInfo& e = edges[out_index];
-    const int dst_id = e.dst_id;
+    const EdgeInfo& e = edges[out_index]; // 输出的边，总共num_output_edges个
+    const int dst_id = e.dst_id; // 待激活的节点id
     const NodeItem* dst_item = gview.node(dst_id);
     const PendingCounts::Handle dst_pending_id = dst_item->pending_id;
     const int src_slot = e.output_slot;
@@ -2595,6 +2600,7 @@ void ExecutorState::FrameState::ActivateNodes(const NodeItem* item,
         }
       }
     } else {
+      // 整个节点dead，或者该edge没有value，设置increment_dead
       const bool increment_dead =
           (is_dead || (!is_control_edge && !(*outputs)[src_slot].has_value));
       int pending, dead;
@@ -2617,7 +2623,7 @@ void ExecutorState::FrameState::ActivateNodes(const NodeItem* item,
     // Add dst to the ready queue if it's ready
     if (dst_ready) {
       if (dst_item->is_control_trigger) dst_dead = false;
-      ready->emplace_back(dst_item->node, this, iter, dst_dead);
+      ready->emplace_back(dst_item->node, this, iter, dst_dead); // 这里可能标识了节点是dead状态
       iter_state->outstanding_ops++;
     }
   }

@@ -89,6 +89,7 @@ DeviceFactory* DeviceFactory::GetFactory(const string& device_type) {
   return it->second.factory.get();
 }
 
+// 创建所有可用的（已注册的）设备对象
 Status DeviceFactory::AddDevices(const SessionOptions& options,
                                  const string& name_prefix,
                                  std::vector<Device*>* devices) {
@@ -115,7 +116,7 @@ Status DeviceFactory::AddDevices(const SessionOptions& options,
 
   return Status::OK();
 }
-
+// 根据类型创建一个设备对象
 Device* DeviceFactory::NewDevice(const string& type,
                                  const SessionOptions& options,
                                  const string& name_prefix) {

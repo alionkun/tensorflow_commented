@@ -22,6 +22,8 @@ limitations under the License.
 namespace tensorflow {
 
 // CPU device implementation.
+// CPU设备的实现，即多线程+RAM分配
+// 设备表示：计算+存储
 class ThreadPoolDevice : public LocalDevice {
  public:
   ThreadPoolDevice(const SessionOptions& options, const string& name,

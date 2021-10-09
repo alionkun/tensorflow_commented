@@ -405,7 +405,7 @@ MATCH_TYPE_AND_ENUM(Variant, DT_VARIANT);
 
 #undef MATCH_TYPE_AND_ENUM
 
-// All types not specialized are marked invalid.
+// All types not specialized are marked invalid. // 没有被特化的类型，都是非法的
 template <class T>
 struct IsValidDataType {
   static constexpr bool value = false;

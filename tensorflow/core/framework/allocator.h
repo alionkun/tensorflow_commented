@@ -67,15 +67,15 @@ struct AllocatorStats {
 
 // Allocator is an abstract interface for allocating and deallocating
 // device memory.
-class Allocator {
+class Allocator { // 定义分配器的接口，用于分配和释放设备上的存储，设备可能是CPU/GPU/TPU
  public:
   // Align to 64 byte boundary.
-  static constexpr size_t kAllocatorAlignment = 64;
+  static constexpr size_t kAllocatorAlignment = 64; // 64字节对齐
 
   virtual ~Allocator();
 
   // Return a string identifying this allocator
-  virtual string Name() = 0;
+  virtual string Name() = 0; // 如果不是google平台，则string为std::string，见tensorflow/core/platform/types.h
 
   // Return an uninitialized block of memory that is "num_bytes" bytes
   // in size.  The returned pointer is guaranteed to be aligned to a

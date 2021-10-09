@@ -154,7 +154,7 @@ class DirectSessionFactory : public SessionFactory {
     if (options.config.graph_options().build_cost_model() > 0) {
       EnableCPUAllocatorFullStats(true);
     }
-    std::vector<Device*> devices;
+    std::vector<Device*> devices; // 包括cpu，可能包括gpu/tpu
     TF_RETURN_IF_ERROR(DeviceFactory::AddDevices(
         options, "/job:localhost/replica:0/task:0", &devices));
 
@@ -753,6 +753,7 @@ Status DirectSession::Run(const RunOptions& run_options,
       feed_args[executors_and_keys->input_name_to_index[it.first]] =
           tensor_from_handle;
     } else {
+      // 参数名称转为在参数列表中的下标，提升效率
       feed_args[executors_and_keys->input_name_to_index[it.first]] = it.second;
     }
   }
@@ -775,6 +776,7 @@ Status DirectSession::Run(const RunOptions& run_options,
   // Receive outputs.
   if (outputs) {
     std::vector<Tensor> sorted_outputs;
+    // 这里是最外层的frame，不可能出现dead tensor，因为内部的每个switch都会对应一个merge，消除了输出dead tensor的可能性
     const Status s = call_frame.ConsumeRetvals(
         &sorted_outputs, /* allow_dead_tensors = */ false);
     if (errors::IsInternal(s)) {
@@ -1289,7 +1291,7 @@ Status DirectSession::CreateExecutors(
     // For regular `Run()`, we use the function calling convention, and so
     // maintain a mapping from input/output names to
     // argument/return-value ordinal index.
-    for (int i = 0; i < callable_options.feed().size(); ++i) {
+    for (int i = 0; i < callable_options.feed().size(); ++i) { // feed是按name排序的tensor-name
       const string& input = callable_options.feed(i);
       ek->input_name_to_index[input] = i;
     }
@@ -1335,6 +1337,13 @@ Status DirectSession::GetOrCreateExecutors(
     debug_tensor_watches_summary = SummarizeDebugTensorWatches(
         run_state_args->debug_options.debug_tensor_watch_opts());
   }
+  // 根据输入、输出的名称构造一个用于寻址现有executor的key，通过cache executor的机制来提升sess.run()的效率
+  // 因为典型的机器学习场景就是使用不同的数据不断地执行同一个逻辑（即同一个计算图，准确地说是一个subgraph）
+  // 所以cache executor而非每次run都创建一个新的executor是有益甚至必要的
+  // 由于key的构造是按照input-name-list和output-name-list顺序拼接的，所以大部分场景下用相同的方法构造key_to_lookup可以找到对应的cached-executor
+  // 但极少数情况下，input-name-list和output-name-list顺序可能发生变化，再按照上述方法在无法hit cache
+  // 通过sort(name-list)的方法可以解决该问题，但耗时较大（需要排序name-list）
+  // 所以每个executor会对应两个key，一个是natural_key，一个是sorted_key，使用前者检索cache，为fastpath，
 
   // Fast lookup path, no sorting.
   const string key = strings::StrCat(

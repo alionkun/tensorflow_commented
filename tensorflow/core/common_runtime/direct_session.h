@@ -137,13 +137,14 @@ class DirectSession : public Session {
   // a partition of the graph bundled with its dependent library runtime.
   // 'input_keys' are the rendezvous keys for the feeds and 'output_keys'
   // are rendezvous keys for the fetches.
-  struct ExecutorsAndKeys {
+  struct ExecutorsAndKeys { // 对应一个feeds/fetches的集合，用户缓存需要执行的subgraph以及状态
     ExecutorsAndKeys() : step_count(0) {}
 
-    std::atomic_int_fast64_t step_count;
-    std::unique_ptr<Graph> graph;
+    std::atomic_int_fast64_t step_count; // graph被执行的次数
+    std::unique_ptr<Graph> graph; // 完整的图
     NameNodeMap name_to_node;
     std::vector<PerPartitionExecutorsAndLib> items;
+    // 输出参数的具名的，通过sort-by-name将其转换为位置参数，通过index引用
     std::unordered_map<string, size_t> input_name_to_index;
     std::unordered_map<string, string> input_name_to_rendezvous_key;
     std::unordered_map<string, size_t> output_name_to_index;

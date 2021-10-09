@@ -1436,7 +1436,7 @@ inline Tensor* OpKernelContext::mutable_output(int index) {
   return outputs_[index].tensor;
 }
 
-inline TensorValue OpKernelContext::release_output(int index) {
+inline TensorValue OpKernelContext::release_output(int index) { // lwk 释放context中的output，并返回该output
   DCHECK_GE(index, 0);
   DCHECK_LT(index, num_outputs());
   TensorValue value = outputs_[index];

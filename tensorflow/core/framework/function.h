@@ -251,10 +251,10 @@ class CallFrameInterface {
 // Represents a function call frame. I.e., the data structure used to
 // pass arguments to a function and retrieve its results.
 //
-// Runtime must arrange accesses to one FunctionCallFrame s.t.
+// Runtime must arrange accesses to one FunctionCallFrame s.t. // s.t. subject to / such that / so that ，使得
 //   1. SetArgs() happens before any GetArg();
 //   2. GetRetvals happens after all SetRetval();
-class FunctionCallFrame : public CallFrameInterface {
+class FunctionCallFrame : public CallFrameInterface { // 表示一个函数调用帧，主要是设置输出和获取输出
  public:
   FunctionCallFrame(DataTypeSlice arg_types, DataTypeSlice ret_types);
   ~FunctionCallFrame();
@@ -275,16 +275,16 @@ class FunctionCallFrame : public CallFrameInterface {
   Status SetRetval(int index, const Tensor& val) override;
 
  private:
-  DataTypeVector arg_types_;
-  DataTypeVector ret_types_;
-  gtl::InlinedVector<Tensor, 4> args_;
+  DataTypeVector arg_types_; // 输入类型
+  DataTypeVector ret_types_; // 输出类型
+  gtl::InlinedVector<Tensor, 4> args_; // 输入
   struct Retval {
-    bool has_val = false;
+    bool has_val = false; // dead tensor has no value
     Tensor val;
   };
-  gtl::InlinedVector<Retval, 4> rets_;
+  gtl::InlinedVector<Retval, 4> rets_; // 输出
 
-  TF_DISALLOW_COPY_AND_ASSIGN(FunctionCallFrame);
+  TF_DISALLOW_COPY_AND_ASSIGN(FunctionCallFrame); // 设置不可以复制对象
 };
 
 // Helper to maintain a map between function names in a given

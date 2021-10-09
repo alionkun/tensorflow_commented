@@ -118,10 +118,10 @@ class Session {
   /// `target_node_names` must be non-empty.
   ///
   /// REQUIRES: outputs is not nullptr if `output_tensor_names` is non-empty.
-  virtual Status Run(const std::vector<std::pair<string, Tensor> >& inputs,
-                     const std::vector<string>& output_tensor_names,
-                     const std::vector<string>& target_node_names,
-                     std::vector<Tensor>* outputs) = 0;
+  virtual Status Run(const std::vector<std::pair<string, Tensor> >& inputs, //输入的tensor
+                     const std::vector<string>& output_tensor_names, // 需要计算并且返回结果的tensor名称
+                     const std::vector<string>& target_node_names, // 需要计算但是没有返回值的节点名称
+                     std::vector<Tensor>* outputs) = 0; // 存储output_tensor_names对应的返回值
 
   /// \brief Implementations which support `RunOptions`.
   //

@@ -45,6 +45,6 @@ class ThreadPoolDeviceFactory : public DeviceFactory {
   }
 };
 
-REGISTER_LOCAL_DEVICE_FACTORY("CPU", ThreadPoolDeviceFactory, 60);
+REGISTER_LOCAL_DEVICE_FACTORY("CPU", ThreadPoolDeviceFactory, 60); // 本地cpu设备，计算能力表示为线程池
 
 }  // namespace tensorflow
